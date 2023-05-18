@@ -30,55 +30,67 @@ class BookingController extends Controller
     }
 
     /**
-     * @param Request $request
+     * @param IndexJobRequest $request
      * @return mixed
      */
-    public function index(Request $request)
+    // There is no validation for requested data
+    // It must have its request file and also manage permission in request file.
+    public function index(IndexJobRequest $request)
     {
-        if($user_id = $request->get('user_id')) {
+        // Bad Approach: there is no assignment in if condition
+        if ($user_id = $request->get('user_id')) {
 
             $response = $this->repository->getUsersJobs($user_id);
 
         }
-        elseif($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID'))
-        {
-            $response = $this->repository->getAll($request);
+        // Bad approach: No need to create a enviromental variable for Admin and super-admin because of every system have multiple admins and superadmins so, we cant use approach
+        // One more thing, We can use spatie laravel permission package for the roles and permissions.
+        // Must write a service file for separate role
+        elseif ($request->__authenticatedUser->user_type == env('ADMIN_ROLE_ID') || $request->__authenticatedUser->user_type == env('SUPERADMIN_ROLE_ID')) {
+            $response = $this->repository->getAll($request->validated());
         }
 
         return response($response);
     }
 
     /**
-     * @param $id
+     * @param $job
      * @return mixed
      */
-    public function show($id)
+    public function show(Job $job)
     {
-        $job = $this->repository->with('translatorJobRel.user')->find($id);
+        $job->load('translatorJobRel.user');
 
-        return response($job);
+        return response()->json([
+            'data' => $job,
+            'message' => 'Success fetching job'
+        ]);
     }
 
     /**
      * @param Request $request
      * @return mixed
      */
+    //Bad Approach: Must have its request file and also validate the data.
     public function store(Request $request)
     {
-        $data = $request->all();
+        $validatedData = $request->validated();
 
-        $response = $this->repository->store($request->__authenticatedUser, $data);
+        $job = $this->repository->store($request->__authenticatedUser, $validatedData);
 
-        return response($response);
+        return response()->jsob([
+            'data' => $job,
+            'message' => 'Success creating job'
+        ]);
 
     }
 
     /**
-     * @param $id
+     * @param Job $job
      * @param Request $request
      * @return mixed
      */
-    public function update($id, Request $request)
+    public function update(Request $request, Job $job)
     {
         $data = $request->all();
         $cuser = $request->__authenticatedUser;
@@ -107,7 +119,7 @@ class BookingController extends Controller
      */
     public function getHistory(Request $request)
     {
-        if($user_id = $request->get('user_id')) {
+        if ($user_id = $request->get('user_id')) {
 
             $response = $this->repository->getUsersJobsHistory($user_id, $request);
             return response($response);
@@ -217,12 +229,12 @@ class BookingController extends Controller
         }
 
         if ($data['flagged'] == 'true') {
-            if($data['admincomment'] == '') return "Please, add comment";
+            if ($data['admincomment'] == '') return "Please, add comment";
             $flagged = 'yes';
         } else {
             $flagged = 'no';
         }
-        
+
         if ($data['manually_handled'] == 'true') {
             $manually_handled = 'yes';
         } else {
